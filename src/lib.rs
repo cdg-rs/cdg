@@ -17,21 +17,20 @@
 //! 12 rows and the left and right 6 columns) are drawn a solid
 //! "border color" rather than drawn from the framebuffer.
 
-
-use std::io::Read;
 use std::fmt;
+use std::io::Read;
 
 /// A 6x12 tile, to be blitted to the display
 #[derive(Debug)]
 pub struct Tile {
     /// X and Y coordinates, in tiles. 0,0 is the top left corner
-    pub pos: (u8,u8), // x, then y
+    pub pos: (u8, u8), // x, then y
     /// The CLUT indices of the background and foreground colors
-    pub color: (u8,u8),
+    pub color: (u8, u8),
     /// A 1bpp representation of the tile. Bytes represent rows; byte
     /// 0 is the top row. Within each byte/row, bit 5 (0x20) is the
     /// leftmost pixel and bit 0 (0x01) is the rightmost.
-    pub content: [u8;12], // LSB is rightmost pixel; byte 0 is top
+    pub content: [u8; 12], // LSB is rightmost pixel; byte 0 is top
     /// The channel to display this tile on.
     pub channel: u8,
 }
@@ -44,9 +43,9 @@ impl Tile {
         }
         let mut content = [0; 12];
         iter_copy(content[..].iter_mut(), data[4..16].iter().map(|x| x & 0x3F));
-        Tile{
+        Tile {
             pos: (data[3] & 0x3F, data[2] & 0x1F),
-            color: (data[0] & 0x0F, data[1] & 0x0F), 
+            color: (data[0] & 0x0F, data[1] & 0x0F),
             content: content,
             // This channel interpretation is from CDGFix. I don't
             // have access to the real specs, so I don't know if it's
@@ -59,7 +58,7 @@ impl Tile {
     pub fn get_pixel(&self, x: u8, y: u8) -> u8 {
         assert!(x < 6);
         assert!(y < 12);
-        
+
         if self.content[y as usize] & (0x20 >> x) == 0 {
             self.color.0
         } else {
@@ -69,7 +68,7 @@ impl Tile {
 }
 
 /// A scroll command
-#[derive(Eq,PartialEq,Debug,Copy,Clone)]
+#[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub enum ScrollCommand {
     /// Don't scroll
     Noop,
@@ -90,8 +89,11 @@ impl ScrollCommand {
     }
 }
 
-fn iter_copy<'a, T: Copy + 'a, DI: Iterator<Item=&'a mut T>, SI: Iterator<Item=T>>(dest: DI, src: SI) {
-    for (dest,src) in dest.zip(src) {
+fn iter_copy<'a, T: Copy + 'a, DI: Iterator<Item = &'a mut T>, SI: Iterator<Item = T>>(
+    dest: DI,
+    src: SI,
+) {
+    for (dest, src) in dest.zip(src) {
         *dest = src;
     }
 }
@@ -102,7 +104,7 @@ fn expand4to8(x: u16) -> u8 {
 }
 
 /// A 12-bit RGB color
-#[derive(Copy,Eq,PartialEq,Clone)]
+#[derive(Copy, Eq, PartialEq, Clone)]
 pub struct RgbColor(u16);
 
 impl fmt::Debug for RgbColor {
@@ -133,14 +135,20 @@ impl RgbColor {
 
         RgbColor((r & 0xF0 << 4) | (g & 0xF0) | (b >> 4))
     }
-    
+
     // This can be done very quickly via SSE; perhaps I'll implement that later
     /// The red component evenly scaled to 0..255
-    pub fn r(&self) -> u8 {expand4to8((self.0 >> 8) & 0xF)}
+    pub fn r(&self) -> u8 {
+        expand4to8((self.0 >> 8) & 0xF)
+    }
     /// The green component evenly scaled to 0..255
-    pub fn g(&self) -> u8 {expand4to8((self.0 >> 4) & 0xF)}
+    pub fn g(&self) -> u8 {
+        expand4to8((self.0 >> 4) & 0xF)
+    }
     /// The blue component evenly scaled to 0..255
-    pub fn b(&self) -> u8 {expand4to8((self.0     ) & 0xF)}
+    pub fn b(&self) -> u8 {
+        expand4to8((self.0) & 0xF)
+    }
 }
 
 /// One drawing command
@@ -152,17 +160,17 @@ pub enum Command {
     /// starting at 0. If you trust your CDG to be without errors, you
     /// can therefore ignore MemoryPreset commands with a nonzero
     /// repeat value
-    MemoryPreset{color: u8, repeat: u8}, // 1
+    MemoryPreset { color: u8, repeat: u8 }, // 1
     /// Clear the border region to `color`. Documents vary as to
     /// whether the border region is the outside tile or the outside
     /// half-tile.
-    BorderPreset{color: u8}, // 2
+    BorderPreset { color: u8 }, // 2
     /// Draw a tile normally
-    TileNormal{tile: Tile},
+    TileNormal { tile: Tile },
     /// Draw a tile by XORing the color indices in the tile with the
     /// colors indices already drawn. Note that this does *not*
     /// operate on RGB values.
-    TileXOR{tile: Tile},
+    TileXOR { tile: Tile },
     /// Scroll the screen by the given horizontal and vertical amount,
     /// respectively. `offset` is given as an absolute position within
     /// the first tile to begin scanout.
@@ -170,16 +178,20 @@ pub enum Command {
     /// If `color` is none, the tiles scrolled off one side of the
     /// framebuffer should be copied to the other side. Otherwise,
     /// they should be filled in with `color`
-    Scroll{color: Option<u8>, cmd: (ScrollCommand, ScrollCommand), offset: (u8, u8)},
+    Scroll {
+        color: Option<u8>,
+        cmd: (ScrollCommand, ScrollCommand),
+        offset: (u8, u8),
+    },
     /// Set one element of the CLUT to transparent, to enable background video/images
-    SetTransparent{color: u8},
+    SetTransparent { color: u8 },
     /// Load one half of the CLUT. `offset` will be either 0 or 8,
     /// depending on whether the bottom or top half of the CLUT is to
     /// be loaded.
     ///
     /// These changes take effect immediately, so this can be used to
     /// implement color cycling.
-    LoadPalette{offset: u8, clut: [RgbColor; 8]},
+    LoadPalette { offset: u8, clut: [RgbColor; 8] },
 }
 
 fn parse_scroll(data: &[u8], is_copy: bool) -> Command {
@@ -191,8 +203,8 @@ fn parse_scroll(data: &[u8], is_copy: bool) -> Command {
     let h_scroll_off = data[1] & 0x07;
     let v_scroll_cmd = ScrollCommand::from_u8(data[2]);
     let v_scroll_off = data[2] & 0x0F;
-        
-    Command::Scroll{
+
+    Command::Scroll {
         color: color,
         cmd: (h_scroll_cmd, v_scroll_cmd),
         offset: (h_scroll_off, v_scroll_off),
@@ -200,8 +212,12 @@ fn parse_scroll(data: &[u8], is_copy: bool) -> Command {
 }
 
 fn parse_clut(data: &[u8]) -> [RgbColor; 8] {
-    let mut result = [RgbColor::from_subchannel(0,0); 8];
-    iter_copy(result.iter_mut(), data.chunks(2).map(|c| RgbColor::from_subchannel(c[0], c[1])));
+    let mut result = [RgbColor::from_subchannel(0, 0); 8];
+    iter_copy(
+        result.iter_mut(),
+        data.chunks(2)
+            .map(|c| RgbColor::from_subchannel(c[0], c[1])),
+    );
     result
 }
 
@@ -210,9 +226,9 @@ fn parse_clut(data: &[u8]) -> [RgbColor; 8] {
 /// return None. Otherwise, returns the command.
 pub fn decode_subchannel_cmd(block: &[u8]) -> Option<Command> {
     if block.len() != 24 {
-        return None
+        return None;
     }
-    
+
     if block[0] & 0x3f != 9 {
         // command is not 9; this isn't a CD+G command
         return None;
@@ -221,15 +237,32 @@ pub fn decode_subchannel_cmd(block: &[u8]) -> Option<Command> {
     let data = &block[4..20];
     // Iterator is now aligned to data[16]
     match block[1] & 0x3f {
-        1 => Some(Command::MemoryPreset{color: data[0] & 0xF, repeat: data[1] & 0xF}),
-        2 => Some(Command::BorderPreset{color: data[0] & 0xF}),
-        6 => Some(Command::TileNormal{tile: Tile::from(data)}),
-        38 => Some(Command::TileXOR{tile: Tile::from(data)}),
+        1 => Some(Command::MemoryPreset {
+            color: data[0] & 0xF,
+            repeat: data[1] & 0xF,
+        }),
+        2 => Some(Command::BorderPreset {
+            color: data[0] & 0xF,
+        }),
+        6 => Some(Command::TileNormal {
+            tile: Tile::from(data),
+        }),
+        38 => Some(Command::TileXOR {
+            tile: Tile::from(data),
+        }),
         20 => Some(parse_scroll(data, false)),
         24 => Some(parse_scroll(data, true)),
-        28 => Some(Command::SetTransparent{color: data[0] & 0xF}),
-        30 => Some(Command::LoadPalette{offset: 0, clut: parse_clut(data)}),
-        31 => Some(Command::LoadPalette{offset: 8, clut: parse_clut(data)}),
+        28 => Some(Command::SetTransparent {
+            color: data[0] & 0xF,
+        }),
+        30 => Some(Command::LoadPalette {
+            offset: 0,
+            clut: parse_clut(data),
+        }),
+        31 => Some(Command::LoadPalette {
+            offset: 8,
+            clut: parse_clut(data),
+        }),
         _ => None, // Invalid command
     }
 }
@@ -241,23 +274,23 @@ pub struct SectorIter<'a> {
     sector_iter: std::slice::Chunks<'a, u8>,
 }
 
-impl <'a> SectorIter<'a> {
+impl<'a> SectorIter<'a> {
     /// Create a new SectorIter from a sector buffer. The buffer must be at least 96 bytes long, and it must be a multiple of 24 bytes.
     pub fn new(sector: &'a [u8]) -> Self {
         assert!(sector.len() >= 96);
         assert!(sector.len() % 24 == 0);
-        SectorIter{
+        SectorIter {
             sector_iter: sector.chunks(24),
         }
     }
 }
-impl <'a> Iterator for SectorIter<'a> {
+impl<'a> Iterator for SectorIter<'a> {
     type Item = Command;
-    
+
     fn next(&mut self) -> Option<Self::Item> {
         match self.sector_iter.next() {
             None => None,
-            Some(cmd) => decode_subchannel_cmd(cmd).or_else(|| self.next())
+            Some(cmd) => decode_subchannel_cmd(cmd).or_else(|| self.next()),
         }
     }
 }
@@ -283,15 +316,15 @@ pub struct SubchannelStreamIter<R: Read> {
     reader: R,
 }
 
-impl <R: Read> SubchannelStreamIter<R> {
+impl<R: Read> SubchannelStreamIter<R> {
     /// Create a new subchannel stream iterator from a Reader
     pub fn new(reader: R) -> Self {
-        SubchannelStreamIter{
-            sector_buf: [0;96],
+        SubchannelStreamIter {
+            sector_buf: [0; 96],
             reader: reader,
         }
     }
-    
+
     /// Fetch the next sector from the input file.
     /// Returns None at EOF
     #[allow(should_implement_trait)] // We really should, but until Rust gets higher-kinded types, we can't.
@@ -306,6 +339,5 @@ impl <R: Read> SubchannelStreamIter<R> {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn it_works() {
-    }
+    fn it_works() {}
 }
