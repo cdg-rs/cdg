@@ -3,7 +3,7 @@ extern crate cdg;
 use std::fs::File;
 
 fn main() {
-    let filename = std::env::args().skip(1).next().expect("Usage: $0 filename");
+    let filename = std::env::args().nth(1).expect("Usage: $0 filename");
     let file = File::open(filename).unwrap();
     let mut scsi = cdg::SubchannelStreamIter::new(file);
 

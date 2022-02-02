@@ -46,7 +46,7 @@ impl Tile {
         Tile {
             pos: (data[3] & 0x3F, data[2] & 0x1F),
             color: (data[0] & 0x0F, data[1] & 0x0F),
-            content: content,
+            content,
             // This channel interpretation is from CDGFix. I don't
             // have access to the real specs, so I don't know if it's
             // accurate.
@@ -205,7 +205,7 @@ fn parse_scroll(data: &[u8], is_copy: bool) -> Command {
     let v_scroll_off = data[2] & 0x0F;
 
     Command::Scroll {
-        color: color,
+        color,
         cmd: (h_scroll_cmd, v_scroll_cmd),
         offset: (h_scroll_off, v_scroll_off),
     }
@@ -321,13 +321,13 @@ impl<R: Read> SubchannelStreamIter<R> {
     pub fn new(reader: R) -> Self {
         SubchannelStreamIter {
             sector_buf: [0; 96],
-            reader: reader,
+            reader,
         }
     }
 
     /// Fetch the next sector from the input file.
     /// Returns None at EOF
-    #[allow(should_implement_trait)] // We really should, but until Rust gets higher-kinded types, we can't.
+    #[allow(clippy::should_implement_trait)] // We really should, but until Rust gets higher-kinded types, we can't.
     pub fn next(&mut self) -> Option<SectorIter> {
         match self.reader.read_exact(&mut self.sector_buf) {
             Ok(_) => Some(SectorIter::new(&self.sector_buf)),
